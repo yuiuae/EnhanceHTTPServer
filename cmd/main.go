@@ -14,9 +14,12 @@ func main() {
 		port = "8080"
 	}
 	// "UserCreate" and "CheckUser" are handler that we will implement
+	http.HandleFunc("/", handlers.Index)
 	http.HandleFunc("/user", handlers.UserCreate)
 	http.HandleFunc("/user/login", handlers.UserLogin)
 	http.HandleFunc("/admin", handlers.GetUserAll)
+
+	http.HandleFunc("/chat/ws", handlers.RequestWithToken)
 
 	// start the server on port 8000
 	log.Fatal(http.ListenAndServe(":"+port, nil))

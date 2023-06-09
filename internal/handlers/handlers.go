@@ -11,19 +11,23 @@ package handlers
 
 import (
 	"encoding/json"
+	"fmt"
+	"log"
 	"net/http"
 	"strconv"
 	"time"
 
+	"github.com/golang-jwt/jwt"
 	"github.com/google/uuid"
+
 	"github.com/yuiuae/EnhanceHTTPServer/pkg/hasher"
 )
 
 // calls per hour allowed by the user
 var callperhour int = 100
 
-// token validity time (in hours)
-var tokentime = 1
+// token validity time (minutes)
+var tokentime = 60
 
 // Table with users
 var usersTable = map[string]UserInfo{}
@@ -81,7 +85,15 @@ func UserCreate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Generate UUID
-	uid, err := uuid.NewUUID()
+
+	// uid, err := uuid.NewUUID()
+	// if err != nil {
+	// 	http.Error(w, "Internal Server Error (UUID error)", http.StatusInternalServerError)
+	// 	return
+	// }
+	// uid := uuid.NewSHA1(uuid.NameSpaceURL, []byte("http://oursite.com"))
+
+	uid, err := uuid.NewRandom()
 	if err != nil {
 		http.Error(w, "Internal Server Error (UUID error)", http.StatusInternalServerError)
 		return
@@ -107,7 +119,7 @@ type LogRequest struct {
 
 // Response
 type LogResponse struct {
-	URL string `json:"username"`
+	URL string `json:"URL"`
 }
 
 // Check username and passoword in user table
@@ -116,6 +128,7 @@ func UserLogin(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Only POST method allowed", http.StatusBadRequest)
 		return
 	}
+
 	req := &LogRequest{}
 	err := json.NewDecoder(r.Body).Decode(req)
 	if err != nil {
@@ -129,10 +142,30 @@ func UserLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	url := "ws://fancy-chat.io/ws&token=one-time-token"
+	// hotp := &HOTP{Secret: "your-secret", Counter: 1000, Length: 8, IsBase32Secret: true}
+	// token := hotp.Get()
+	var sampleSecretKey = "SecretYouShouldHide"
+	token := jwt.New(jwt.SigningMethodHS256)
+	// token := jwt.New(jwt.SigningMethodEdDSA)
+	claims := token.Claims.(jwt.MapClaims)
+	claims["Id"] = usersTable[req.UserName].Id
+	claims["username"] = req.UserName
+	claims["exp"] = time.Now().UTC().Add(time.Minute * time.Duration(tokentime)).String()
+	// tokenString, err := token.SignedString(sampleSecretKey)
+	tokenString, err := jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString([]byte(sampleSecretKey))
+	if err != nil {
+		http.Error(w, "Internal Server Error (jwt Encoder)", http.StatusInternalServerError)
+		fmt.Println(err)
+		log.Println(err)
+		return
+	}
+
+	url := fmt.Sprintf("ws://localhost:8080/ws&token=%s", tokenString)
 	resp := &LogResponse{url}
+
+	w.Header().Set("Content-Type", "application/json")
 	w.Header().Add("X-Rate-Limit", strconv.Itoa(callperhour))
-	w.Header().Add("X-Expires-After", time.Now().UTC().Add(time.Hour*time.Duration(tokentime)).String())
+	w.Header().Add("X-Expires-After", time.Now().UTC().Add(time.Minute*time.Duration(tokentime)).String())
 	err = json.NewEncoder(w).Encode(resp)
 	if err != nil {
 		http.Error(w, "Internal Server Error (json Encoder)", http.StatusInternalServerError)
