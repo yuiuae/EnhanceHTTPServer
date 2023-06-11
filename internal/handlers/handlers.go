@@ -29,12 +29,17 @@ var callperhour int = 100
 // token validity time (minutes)
 var tokentime = 60
 
+// secret key for token
+var tokenSecretKey = "SecretYouShouldHide"
+
 // Table with users
-var usersTable = map[string]UserInfo{}
+var usersTable = map[string]*UserInfo{}
 
 type UserInfo struct {
 	Passhash string
 	Id       string
+	Token    string
+	ExpireAt int64
 }
 
 // Create a struct that models the structure for a user creating
@@ -107,7 +112,7 @@ func UserCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// add new user to to user table
-	usersTable[req.UserName] = UserInfo{hashedPassword, uid.String()}
+	usersTable[req.UserName] = &UserInfo{hashedPassword, uid.String(), "", 0}
 }
 
 // Create a struct that models the structure for a user login
@@ -142,17 +147,16 @@ func UserLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// hotp := &HOTP{Secret: "your-secret", Counter: 1000, Length: 8, IsBase32Secret: true}
-	// token := hotp.Get()
-	var sampleSecretKey = "SecretYouShouldHide"
+	// usersTable[req.UserName].ExpireAt = time.Now().UTC().Add(time.Minute * time.Duration(tokentime))
+	usersTable[req.UserName].ExpireAt = time.Now().UTC().Add(time.Minute * time.Duration(tokentime)).Unix()
 	token := jwt.New(jwt.SigningMethodHS256)
-	// token := jwt.New(jwt.SigningMethodEdDSA)
 	claims := token.Claims.(jwt.MapClaims)
 	claims["Id"] = usersTable[req.UserName].Id
 	claims["username"] = req.UserName
-	claims["exp"] = time.Now().UTC().Add(time.Minute * time.Duration(tokentime)).String()
-	// tokenString, err := token.SignedString(sampleSecretKey)
-	tokenString, err := jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString([]byte(sampleSecretKey))
+	claims["exp"] = usersTable[req.UserName].ExpireAt
+	fmt.Println(claims)
+	tokenString, err := jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString([]byte(tokenSecretKey))
+	usersTable[req.UserName].Token = tokenString
 	if err != nil {
 		http.Error(w, "Internal Server Error (jwt Encoder)", http.StatusInternalServerError)
 		fmt.Println(err)
@@ -160,12 +164,12 @@ func UserLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	url := fmt.Sprintf("ws://localhost:8080/ws&token=%s", tokenString)
+	url := fmt.Sprintf("ws://localhost:8080/chat?token=%s", usersTable[req.UserName].Token)
 	resp := &LogResponse{url}
 
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Add("X-Rate-Limit", strconv.Itoa(callperhour))
-	w.Header().Add("X-Expires-After", time.Now().UTC().Add(time.Minute*time.Duration(tokentime)).String())
+	w.Header().Add("X-Expires-After", strconv.Itoa(int(usersTable[req.UserName].ExpireAt)))
 	err = json.NewEncoder(w).Encode(resp)
 	if err != nil {
 		http.Error(w, "Internal Server Error (json Encoder)", http.StatusInternalServerError)

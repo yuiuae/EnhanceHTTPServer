@@ -19,7 +19,7 @@ func main() {
 	http.HandleFunc("/user/login", handlers.UserLogin)
 	http.HandleFunc("/admin", handlers.GetUserAll)
 
-	http.HandleFunc("/chat/ws", handlers.RequestWithToken)
+	http.HandleFunc("/chat", handlers.RequestWithToken)
 
 	// start the server on port 8000
 	log.Fatal(http.ListenAndServe(":"+port, nil))
