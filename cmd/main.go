@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/yuiuae/EnhanceHTTPServer/internal/handlers"
+	"github.com/yuiuae/EnhanceHTTPServer/internal/middleware"
 )
 
 func main() {
@@ -13,14 +14,13 @@ func main() {
 	if port == "" {
 		port = "8080"
 	}
-	// "UserCreate" and "CheckUser" are handler that we will implement
-	http.HandleFunc("/", middleware.middleLog(handlers.Index))
-	// http.HandleFunc("/", handlers.Index)
-	http.HandleFunc("/user", middleware.middleLog(handlers.UserCreate))
-	http.HandleFunc("/user/login", middleware.middleLog(handlers.UserLogin))
-	http.HandleFunc("/admin", middleware.middleLog(handlers.GetUserAll))
+	http.Handle("/", middleware.MiddleLog(http.HandlerFunc(handlers.Index)))
+	http.Handle("/user", middleware.MiddleLog(http.HandlerFunc(handlers.UserCreate)))
+	http.Handle("/user/login", middleware.MiddleLog(http.HandlerFunc(handlers.UserLogin)))
+	http.Handle("/admin", middleware.MiddleLog(http.HandlerFunc(handlers.GetUserAll)))
+	http.Handle("/actusers", middleware.MiddleLog(http.HandlerFunc(handlers.ActiveUsers)))
 
-	http.HandleFunc("/chat", middleware.middleLog(handlers.RequestWithToken))
+	http.Handle("/chat", middleware.MiddleLog(http.HandlerFunc(handlers.RequestWithToken)))
 
 	// start the server on port 8000
 	log.Fatal(http.ListenAndServe(":"+port, nil))

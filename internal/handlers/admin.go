@@ -16,7 +16,7 @@ import (
 
 func Index(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "GET" {
-		http.Error(w, "Only GET method allowed", http.StatusBadRequest)
+		errorlog(w, "Only GET method allowed", http.StatusBadRequest)
 		return
 	}
 
@@ -30,7 +30,7 @@ func Index(w http.ResponseWriter, r *http.Request) {
 
 func GetUserAll(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "GET" {
-		http.Error(w, "Only GET method allowed", http.StatusBadRequest)
+		errorlog(w, "Only GET method allowed", http.StatusBadRequest)
 		return
 	}
 

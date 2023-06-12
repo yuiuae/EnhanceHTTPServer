@@ -58,34 +58,34 @@ type CrResponse struct {
 // Create new use and add to user table
 func UserCreate(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "POST" {
-		http.Error(w, "Only POST method allowed", http.StatusBadRequest)
+		errorlog(w, "Only POST method allowed ", http.StatusBadRequest)
 		return
 	}
 	req := &CrRequest{}
 	err := json.NewDecoder(r.Body).Decode(req)
 	if err != nil {
-		http.Error(w, "Bad request, empty username or password", http.StatusBadRequest)
+		errorlog(w, "Bad request, empty username or password", http.StatusBadRequest)
 		return
 	}
 	if len(req.UserName) <= 4 {
-		http.Error(w, "Username should be at least 4 characters", http.StatusBadRequest)
+		errorlog(w, "Username should be at least 4 characters", http.StatusBadRequest)
 		return
 	}
 
 	if len(req.Password) <= 8 {
-		http.Error(w, "Password should be at least 8 characters", http.StatusBadRequest)
+		errorlog(w, "Password should be at least 8 characters", http.StatusBadRequest)
 		return
 	}
 	_, b := usersTable[req.UserName]
 	if b {
-		http.Error(w, "A user with this name already exists", http.StatusConflict)
+		errorlog(w, "A user with this name already exists", http.StatusConflict)
 		return
 	}
 
 	// Hash the password using the bcrypt algorithm
 	hashedPassword, err := hasher.HashPassword(req.Password)
 	if err != nil {
-		http.Error(w, "Internal Server Error (hash error)", http.StatusInternalServerError)
+		errorlog(w, "Internal Server Error (hash error)", http.StatusInternalServerError)
 		return
 	}
 
@@ -100,7 +100,7 @@ func UserCreate(w http.ResponseWriter, r *http.Request) {
 
 	uid, err := uuid.NewRandom()
 	if err != nil {
-		http.Error(w, "Internal Server Error (UUID error)", http.StatusInternalServerError)
+		errorlog(w, "Internal Server Error (UUID error)", http.StatusInternalServerError)
 		return
 	}
 
@@ -108,7 +108,7 @@ func UserCreate(w http.ResponseWriter, r *http.Request) {
 	resp := &CrResponse{uid.String(), req.UserName}
 	err = json.NewEncoder(w).Encode(&resp) //&resp
 	if err != nil {
-		http.Error(w, "Internal Server Error (json Encoder error)", http.StatusInternalServerError)
+		errorlog(w, "Internal Server Error (json Encoder error)", http.StatusInternalServerError)
 		return
 	}
 	// add new user to to user table
@@ -130,20 +130,20 @@ type LogResponse struct {
 // Check username and passoword in user table
 func UserLogin(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "POST" {
-		http.Error(w, "Only POST method allowed", http.StatusBadRequest)
+		errorlog(w, "Only POST method allowed", http.StatusBadRequest)
 		return
 	}
 
 	req := &LogRequest{}
 	err := json.NewDecoder(r.Body).Decode(req)
 	if err != nil {
-		http.Error(w, "Bad request, empty username or password", http.StatusBadRequest)
+		errorlog(w, "Bad request, empty username or password", http.StatusBadRequest)
 		return
 	}
 
 	ok := hasher.CheckPasswordHash(usersTable[req.UserName].Passhash, req.Password)
 	if !ok {
-		http.Error(w, "Invalid username/password", http.StatusBadRequest)
+		errorlog(w, "Invalid username/password", http.StatusBadRequest)
 		return
 	}
 
@@ -172,7 +172,7 @@ func UserLogin(w http.ResponseWriter, r *http.Request) {
 	w.Header().Add("X-Expires-After", strconv.Itoa(int(usersTable[req.UserName].ExpireAt)))
 	err = json.NewEncoder(w).Encode(resp)
 	if err != nil {
-		http.Error(w, "Internal Server Error (json Encoder)", http.StatusInternalServerError)
+		errorlog(w, "Internal Server Error (json Encoder)", http.StatusInternalServerError)
 		return
 	}
 }

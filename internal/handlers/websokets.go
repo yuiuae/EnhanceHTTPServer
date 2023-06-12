@@ -13,32 +13,49 @@ var upgrader = websocket.Upgrader{}
 
 // websocket connection request
 func RequestWithToken(w http.ResponseWriter, r *http.Request) {
-	conn, err := upgrader.Upgrade(w, r, nil)
-	if err != nil {
-		log.Print("upgrade:", err)
+	if r.Method != "GET" {
+		errorlog(w, "Only GET method allowed", http.StatusBadRequest)
 		return
 	}
-	token := r.URL.Query().Get("token")
-	username, err := parseToken(token, []byte(tokenSecretKey))
+
+	reqToken := r.URL.Query().Get("token")
+	username, err := parseToken(reqToken, []byte(tokenSecretKey))
 	if err != nil {
-		log.Print("parse:", err)
+		errorlog(w, "Internal Server Error (parse)", http.StatusInternalServerError)
+		return
+	}
+
+	_, exists := usersTable[username]
+	if !exists {
+		errorlog(w, "User error", http.StatusBadRequest)
+		return
+	}
+
+	if reqToken != usersTable[username].Token {
+		errorlog(w, "Invalid token", http.StatusBadRequest)
 		return
 	}
 
 	usersTable[username].Token = ""
 	usersTable[username].ExpireAt = 0
-
+	conn, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		errorlog(w, "Internal Server Error (upgrade)", http.StatusInternalServerError)
+		return
+	}
+	activeUsers[username] = true
+	defer delete(activeUsers, username)
 	defer conn.Close()
 	for {
 		mt, message, err := conn.ReadMessage()
 		if err != nil {
-			log.Println("read:", err)
+			errorlog(w, "Internal Server Error (ws read)", http.StatusInternalServerError)
 			break
 		}
 		log.Printf("recv: %s", message)
 		err = conn.WriteMessage(mt, message)
 		if err != nil {
-			log.Println("write:", err)
+			errorlog(w, "Internal Server Error (ws write)", http.StatusInternalServerError)
 			break
 		}
 	}
@@ -46,16 +63,6 @@ func RequestWithToken(w http.ResponseWriter, r *http.Request) {
 
 // parse token from a websocket user connection request
 func parseToken(accessToken string, signingKey []byte) (string, error) {
-	// claims := jwt.MapClaims{}
-	// token, err := jwt.ParseWithClaims(accessToken, &claims, func(token *jwt.Token) (interface{}, error) { return []byte(signingKey), nil })
-	// fmt.Println(token.Claims)
-	// if err != nil {
-	// 	return "", err
-	// }
-	// for key, val := range claims {
-	// 	fmt.Printf("Key: %v, value: %v\n", key, val)
-	// }
-
 	var username string
 	token, _, err := new(jwt.Parser).ParseUnverified(accessToken, jwt.MapClaims{})
 	if err != nil {
