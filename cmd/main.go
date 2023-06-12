@@ -14,12 +14,13 @@ func main() {
 		port = "8080"
 	}
 	// "UserCreate" and "CheckUser" are handler that we will implement
-	http.HandleFunc("/", handlers.Index)
-	http.HandleFunc("/user", handlers.UserCreate)
-	http.HandleFunc("/user/login", handlers.UserLogin)
-	http.HandleFunc("/admin", handlers.GetUserAll)
+	http.HandleFunc("/", middleware.middleLog(handlers.Index))
+	// http.HandleFunc("/", handlers.Index)
+	http.HandleFunc("/user", middleware.middleLog(handlers.UserCreate))
+	http.HandleFunc("/user/login", middleware.middleLog(handlers.UserLogin))
+	http.HandleFunc("/admin", middleware.middleLog(handlers.GetUserAll))
 
-	http.HandleFunc("/chat", handlers.RequestWithToken)
+	http.HandleFunc("/chat", middleware.middleLog(handlers.RequestWithToken))
 
 	// start the server on port 8000
 	log.Fatal(http.ListenAndServe(":"+port, nil))
